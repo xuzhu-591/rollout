@@ -1,0 +1,23 @@
+{
+    "ui:order": [
+        "app"
+    ],
+    "app":{
+        "ui:order":[
+            "spec",
+            "strategy",
+            "startCommand",
+            "envs"
+        ],
+        "spec": {
+          "ui:order":[
+            "replicas",
+            "resource",
+            "cpu",
+            "memory",
+            "*"
+          ]
+        }
+    }
+}
+

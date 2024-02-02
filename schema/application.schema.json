@@ -1,0 +1,285 @@
+{
+  "type": "object",
+  "properties": {
+    "app": {
+      "title": "应用",
+      "type": "object",
+      "properties": {
+        "spec": {
+          "type": "object",
+          "title": "规格",
+          "properties": {
+            {{- if .resourceType }}
+            {{- if eq .resourceType "cluster" }}
+            "replicas": {
+              "type": "integer",
+              "title": "副本数",
+              "default": 1,
+              "minimum": 0,
+              "maximum":
+              {{- .maxReplicas | default 30 }}
+            },
+            {{- end }}
+            {{- end }}
+           "resource": {
+              "type": "string",
+              "title": "规格",
+              "description": "应用上建议选择tiny或者small规格（测试环境集群自动继承，节省资源使用），线上集群可选大规格",
+              "default": "x-small",
+              "oneOf": [
+                {
+                  "enum": [
+                    "tiny"
+                  ],
+                  "title": "tiny(0.5C1G)"
+                },
+                {
+                  "enum": [
+                    "x-small"
+                  ],
+                  "title": "x-small(1C2G)"
+                },
+                {
+                  "enum": [
+                    "small"
+                  ],
+                  "title": "small(2C4G)"
+                },
+                {
+                  "enum": [
+                    "middle"
+                  ],
+                  "title": "middle(4C8G)"
+                }
+                {{- if .supportMoreSpecs -}}
+                {{- if contains "large" .supportMoreSpecs -}},
+                {
+                  "enum": [
+                    "large"
+                  ],
+                  "title": "large(8C16G)"
+                }
+                {{- end -}}
+                {{- if contains "flexible" .supportMoreSpecs -}},
+                {
+                  "enum": [
+                    "flexible"
+                  ],
+                  "title": "flexible"
+                }
+                {{- end -}}
+                {{- end -}}
+              ]
+            }
+          },
+          "dependencies": {
+            "resource": {
+              "oneOf": [
+                {
+                  "properties": {
+                    "resource": {
+                      "enum": [
+                        "flexible"
+                      ],
+                      "title": "flexible"
+                    },
+                    "cpu": {
+                      "type": "integer",
+                      "title": "cpu",
+                      "description": "单位：m，应用上建议选择500或者1000规格（测试环境集群自动继承，节省资源使用），线上集群可选大规格",
+                      "default": 500,
+                      "enum": [
+                        500,
+                        1000,
+                        2000,
+                        4000,
+                        6000,
+                        8000
+                      ]
+                    },
+                    "memory": {
+                      "type": "integer",
+                      "title": "memory",
+                      "description": "单位：MB，应用上建议选择1024或者2048规格（测试环境集群自动继承，节省资源使用），线上集群可选大规格",
+                      "default": 1024,
+                      "enum": [
+                        1024,
+                        2048,
+                        4096,
+                        6144,
+                        8192,
+                        10240,
+                        12288,
+                        14336,
+                        16384
+                      ]
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "resource": {
+                      "enum": [
+                        "tiny"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "resource": {
+                      "enum": [
+                        "x-small"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "resource": {
+                      "enum": [
+                        "small"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "resource": {
+                      "enum": [
+                        "middle"
+                      ]
+                    }
+                  }
+                },
+                {
+                  "properties": {
+                    "resource": {
+                      "enum": [
+                        "large"
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {{- if .resourceType }}
+        {{- if eq .resourceType "cluster" }}
+        "strategy": {
+          "type": "object",
+          "title": "发布策略",
+          "properties": {
+            "stepsTotal": {
+              "type": "integer",
+              "title": "发布批次（多批次情况下，第一批默认为1个实例）",
+              "default": 1,
+              {{- $maxStep := .maxStep | default 5 }}
+              "enum":
+              {{- cat (until (int (add (int $maxStep) 1)) | rest | join ",") "]" | cat "[" }}
+            },
+            "pauseType": {
+              "type": "string",
+              "title": "暂停策略",
+              "default": "all",
+              "oneOf": [
+                {
+                  "enum": [
+                    "first"
+                  ],
+                  "title": "第一批暂停"
+                },
+                {
+                  "enum": [
+                    "all"
+                  ],
+                  "title": "全部暂停"
+                },
+                {
+                  "enum": [
+                    "none"
+                  ],
+                  "title": "全不暂停"
+                }
+              ]
+            },
+            "advanced": {
+              "type": "object",
+              "title": "高级配置",
+              "properties": {
+                "enabled": {
+                  "title": "开启",
+                  "type": "boolean",
+                  "enum": [
+                    false,
+                    true
+                  ],
+                  "default": false
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "enabled": {
+                        "const": true
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "maxSurge": {
+                        "type": "string",
+                        "description": "最大扩容副本数。最大扩容副本数越大，分批发布速度理论上越快（发布效率同样受分批批次和k8s资源水位等因素影响）。该参数默认为20，仅在线上和预发环境生效；其他环境默认100%",
+                        "default": "20",
+                        "enum": [
+                          "20",
+                          "30",
+                          "50"
+                        ]
+                      },
+                      "maxUnavailable": {
+                        "type": "string",
+                        "description": "最大不可用副本数比例。该配置在资源紧张情况下可有效加快部署效率（先杀后扩），但可能对业务有损，请合理评估风险，谨慎使用！。举例：期望副本数为100，该参数设置为30%，意味着发布过程中仅能保证70个正常的pod承接流量",
+                        "default": "0",
+                        "enum": [
+                          "0",
+                          "10%",
+                          "20%",
+                          "30%"
+                        ]
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {{- end }}
+        {{- end }}
+        "startCommand": {
+          "type": "string",
+          "title": "启动命令",
+          "description": "启动命令，如：java -jar xxx.jar"
+        },
+        "envs": {
+          "type": "array",
+          "title": "环境变量",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

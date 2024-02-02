@@ -1,0 +1,108 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: {{ .Values.horizon.cluster }}
+  labels:
+{{- include "podLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.app.spec.replicas }}
+  revisionHistoryLimit: {{ .Values.revisionHistoryLimit | default 3 }}
+  progressDeadlineSeconds: {{ .Values.app.health.expectedStartTime | add 200 }}
+  selector:
+    matchLabels:
+{{- include "podLabels" . | nindent 6 }}
+  strategy:
+    canary:
+      steps: {{ tpl (include "canarySteps" .) . }}
+      ######## pre 和 online 环境，maxSurge 可自定义，默认20，其他环境 maxSurge 设置为100%，加快用户部署进度
+      {{- if or (eq .Values.env.environment "pre") (eq .Values.env.environment "online") }}
+      {{- if and .Values.app.strategy.advanced.enabled .Values.app.strategy.advanced.maxSurge }}
+      maxSurge: {{ .Values.app.strategy.advanced.maxSurge }}
+      {{- else }}
+      maxSurge: {{ .Values.canary.maxSurge }}
+      {{- end }}
+      {{- else }}
+      maxSurge: "100%"
+      {{- end }}
+      {{- if and .Values.app.strategy.advanced.enabled .Values.app.strategy.advanced.maxUnavailable }}
+      maxUnavailable: {{ .Values.app.strategy.advanced.maxUnavailable }}
+      {{- else }}
+      maxUnavailable: {{ .Values.canary.maxUnavailable }}
+      {{- end }}
+      initialReleaseCanary: true
+      availableCheckNewRSOnly: true
+  template:
+    metadata:
+      labels:
+{{- include "podLabels" . | nindent 8 }}
+      {{- $podAnnotations := include "podAnnotations" . }}
+      {{- if $podAnnotations }}
+      annotations: {{- $podAnnotations | nindent 8 }}
+      {{- end }}
+    spec:
+      ####### podExtra #######
+      {{- with .Values.podExtra }}
+      {{- toYaml . | nindent 6 }}
+      {{- end }}
+      ####### end podExtra #######
+      ####### HostAlias #######
+      {{- with .Values.hostAliases }}
+      hostAliases:
+        {{- toYaml . | nindent 6 }}
+      {{- end }}
+      ####### end HostAlias #######
+      ########## affinity ############
+      {{- if .Values.affinity }}
+      affinity: {{ tpl (.Values.affinity | toYaml ) (.) | nindent 8 }}
+      {{- end }}
+      ########## end  affinity ############
+      ########## dnsPolicy ############
+      dnsPolicy: {{ .Values.dnsPolicy }}
+      ########## end dnsPolicy ############
+      containers:
+      - name: {{ .Values.horizon.cluster }}
+        image: {{ .Values.image }}
+        {{- if .Values.app.startCommand }}
+        command:
+          - /bin/sh
+          - -c
+        args:
+          - "{{ .Values.app.startCommand }}"
+        {{- end }}
+        ####### containerExtra #######
+        {{- with .Values.containerExtra }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        ####### end containerExtra #######
+        env:
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          - name: POD_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.podIP
+          - name: NODE_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: spec.nodeName
+        {{- with .Values.horizon.application }}
+          - name: HORIZON_APPLICATION
+            value: "{{ . }}"
+        {{- end }}
+        {{- with .Values.horizon.cluster }}
+          - name: HORIZON_CLUSTER
+            value: "{{ . }}"
+        {{- end }}
+        {{- with .Values.env.environment }}
+          - name: HORIZON_ENVIRONMENT
+            value: "{{ . }}"
+        {{- end }}
+        {{- range $index, $item :=.Values.app.envs }}
+          - name: {{ $item.name | quote }}
+            value: {{ $item.value | quote }}
+        {{- end }}
+        ######### resources #########
+        resources: {{ include "resources" . | nindent 10 }}
+        ######### end resources #########

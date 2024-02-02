@@ -1,0 +1,90 @@
+## the params for app
+app:
+  spec:
+    replicas: 1
+    resource: x-small
+  strategy:
+    pauseType: all
+    stepsTotal: 1
+    advanced:
+      enabled: false
+      maxSurge: "20"
+      maxUnavailable: 0
+  envs: []
+  startCommand: ""
+  health:
+    expectedStartTime: 200
+
+horizon:
+  application:
+  cluster:
+  priority:
+
+env:
+  environment: ""
+  region:
+  namespace:
+
+# artifacts image
+image: ""
+
+# tags
+tags: {}
+
+resources:
+  tiny:
+    cpu: 500
+    memory: 1024
+  x-small:
+    cpu: 1000
+    memory: 2048
+  small:
+    cpu: 2000
+    memory: 4096
+  middle:
+    cpu: 4000
+    memory: 8192
+  large:
+    cpu: 8000
+    memory: 16384
+  flexible:
+    cpu: "{{ .Values.app.spec.cpu | default 500 }}"
+    memory: "{{ .Values.app.spec.memory | default 1024 }}"
+
+oversale:
+  cpu:
+    online: 30
+    others: 40
+
+# affinity, Ref: https://kubernetes.io/zh/docs/concepts/scheduling-eviction/assign-pod-node/
+affinity:
+  # podAntiAffinity
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 100
+      podAffinityTerm:
+        labelSelector:
+          matchExpressions:
+          - key: horizoncd.github.io/cluster
+            operator: In
+            values:
+            - "{{ .Values.horizon.cluster }}"
+        topologyKey: "kubernetes.io/hostname"
+
+# dnsPolicy. the kubernetes' default value is "ClusterFirst".
+# In order to not use core-dns or kube-dns, we set this value to "Default".
+# Ref: https://kubernetes.io/zh/docs/concepts/services-networking/dns-pod-service/#pod-s-dns-policy
+dnsPolicy: Default
+
+# podExtra, podSpec extra field, you can define fields which is not exactly defined. For example:
+# podExtra:
+#   nodeSelector:
+#     nodeKey: nodeValue
+podExtra: {}
+
+# containerExtra, container extra field
+containerExtra: {}
+
+# restart time, used to restart this application
+restartTime:
+
